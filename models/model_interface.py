@@ -77,12 +77,24 @@ class PLModelInterface(pl.LightningModule):
         args1.update(other_args)
         return object_cls(**args1)
 
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = parent_parser.add_argument_group("PLModelTripletInterface")
+        parser.add_argument("--model_name", type=str, required=True)
+        parser.add_argument("--loss_name", type=str, required=True)
+        parser.add_argument("--lr", type=float, required=True)
+        parser.add_argument("--lr_scheduler", type=str, default=None)
+
+        return parent_parser
 
 class PLModelTripletInterface(PLModelInterface):
-    def __init__(self, model_name, loss_name, **kwargs):
+    def __init__(self, model_name='bert_encoder', loss_name='triplet_loss', **kwargs):
         super().__init__(model_name, loss_name, **kwargs)
 
-    
+    def forward(self, input):
+        embeddings = self.model(input)
+        return embeddings
+        
     def training_step(self, batch, batch_idx):
         token_anchor, token_pos, token_neg = batch
         embed_anchor = self.model(token_anchor)
@@ -92,8 +104,6 @@ class PLModelTripletInterface(PLModelInterface):
         self.log('loss', loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return loss
-
-
 
 if __name__ == '__main__':
     model = PLModelTripletInterface(model_name='bert_encoder', loss_name='triplet', pretrained_model_name="distilbert-base-uncased")
