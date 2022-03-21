@@ -1,0 +1,2 @@
+assets/msmarco/query_2_groundtruth_passage_small.json filter=lfs diff=lfs merge=lfs -text
+assets/msmarco/query_2_top_1000_passage_BM25.json filter=lfs diff=lfs merge=lfs -text
