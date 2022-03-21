@@ -1,7 +1,7 @@
 data_root=/home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/train_data_full_1000000/
 
 python run_task.py \
---gpus 4 \
+--gpus 1 \
 --limit_train_batches 1.0 \
 --max_epochs 3 \
 --lr 2e-6 \
