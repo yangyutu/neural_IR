@@ -14,6 +14,12 @@ class BertEncoder(torch.nn.Module):
         cls_representation = last_hidden_state[:,0,:]
         return cls_representation
 
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = parent_parser.add_argument_group("BertEncoder")
+        parser.add_argument("--pretrained_model_name", type=str, required=True)
+        return parent_parser
+
 
 if __name__ == '__main__':
 

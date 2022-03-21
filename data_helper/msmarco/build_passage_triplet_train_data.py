@@ -5,6 +5,7 @@ from tqdm import tqdm
 import json, os, pickle
 from collections import defaultdict
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -43,12 +44,10 @@ def build_tokenized_data(args, qid_set, pid_set):
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    output_name = ''.join(['qid_2_query_token_ids', args.name_tag, '.pkl']) if args.name_tag else 'qid_2_query_token_ids.pkl'
-    with open(os.path.join(args.output_dir, output_name), 'wb') as file:
+    with open(os.path.join(args.output_dir, 'qid_2_query_token_ids.pkl'), 'wb') as file:
         pickle.dump(qid_2_query_token_ids, file)
     
-    output_name = ''.join(['pid_2_passage_token_ids', args.name_tag, '.pkl']) if args.name_tag else 'pid_2_passage_token_ids.pkl'
-    with open(os.path.join(args.output_dir, output_name), 'wb') as file:
+    with open(os.path.join(args.output_dir, 'pid_2_passage_token_ids.pkl'), 'wb') as file:
         pickle.dump(pid_2_passage_token_ids, file)  
 
     logger.info(f"done!")
@@ -67,13 +66,16 @@ def build_triplets(args):
             pid_set.add(neg_id)
             # only keep valid triplets
             # if qid in qid_2_query and pos_id in pid_2_passage and neg_id in pid_2_passage:
-                
+
+    random.shuffle(triplets)
+    sub_sample = 1000000
+    triplets = triplets[:sub_sample]
+
     logger.info(f"there are {len(triplets)} triplets in the training data")
     
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    output_name = ''.join(['triplets', args.name_tag, '.pkl']) if args.name_tag else 'triplets.pkl'
     with open(os.path.join(args.output_dir, 'triplets.pkl'), 'wb') as file:
         pickle.dump(triplets, file)
     
@@ -91,6 +93,8 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str)
     parser.add_argument('--name_tag', type=str, default='')
     args = parser.parse_args()
+
+    print(args)
 
     qid_set, pid_set = build_triplets(args)
     build_tokenized_data(args, qid_set, pid_set)
