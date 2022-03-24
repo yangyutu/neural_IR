@@ -1,11 +1,12 @@
-data_root=/home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/train_data_full_1000000/
+data_root=/home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/train_data_small/
 
 python run_task.py \
 --gpus 1 \
 --limit_train_batches 1.0 \
---max_epochs 3 \
+--max_epochs 30 \
 --lr 2e-6 \
---batch_size 32 \
+--batch_size 64 \
+--margin 20.0 \
 --tokenizer_name distilbert-base-uncased \
 --pretrained_model_name distilbert-base-uncased \
 --model_name bert_encoder \

@@ -3,27 +3,31 @@ import torch.nn as nn
 import torch.nn.functional as F
 from enum import Enum
 
+
 class TripletDistanceMetric(Enum):
     """
     The metric for triplet loss
     """
-    
+
     COSINE = lambda x, y: 1 - F.cosine_similarity(x, y)
     EUCLIDEAN = lambda x, y: F.pairwise_distance(x, y, p=2)
     MANHATTAN = lambda x, y: F.pairwise_distance(x, y, p=1)
 
+
 def euclidean_distance(x, y):
     return F.pairwise_distance(x, y, p=2)
 
+
 def get_distance_metric(distance_metric):
 
-    if distance_metric == 'euclidean':
+    if distance_metric == "euclidean":
         return euclidean_distance
     else:
-        raise ValueError(f'{distance_metric} is not supported!')
+        raise ValueError(f"{distance_metric} is not supported!")
+
 
 class TripletLoss(nn.Module):
-    def __init__(self, distance_metric='euclidean', margin=0.0):
+    def __init__(self, distance_metric="euclidean", margin=0.0):
         super().__init__()
 
         self.distance_metric = get_distance_metric(distance_metric)
@@ -39,3 +43,9 @@ class TripletLoss(nn.Module):
         losses = F.relu(distance_pos - distance_neg + self.margin)
 
         return losses.mean()
+
+    @staticmethod
+    def add_loss_specific_args(parent_parser):
+        parser = parent_parser.add_argument_group("TripletLoss")
+        parser.add_argument("--margin", type=float, default=1.0)
+        return parent_parser

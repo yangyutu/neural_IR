@@ -6,8 +6,8 @@ import pytorch_lightning as pl
 import inspect
 import importlib
 
-class PLModelInterface(pl.LightningModule):
 
+class PLModelInterface(pl.LightningModule):
     def __init__(self, model_name, loss_name, **kwargs):
         super().__init__()
         self.save_hyperparameters()
@@ -15,52 +15,58 @@ class PLModelInterface(pl.LightningModule):
         self.load_loss()
 
     def configure_optimizers(self):
-        if hasattr(self.hparams, 'weight_decay'):
+        if hasattr(self.hparams, "weight_decay"):
             weight_decay = self.hparams.weight_decay
         else:
             weight_decay = 0
         optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.hparams.lr, weight_decay=weight_decay)
+            self.parameters(), lr=self.hparams.lr, weight_decay=weight_decay
+        )
 
         if self.hparams.lr_scheduler is None:
             return optimizer
         else:
-            if self.hparams.lr_scheduler == 'step':
-                scheduler = lrs.StepLR(optimizer,
-                                       step_size=self.hparams.lr_decay_steps,
-                                       gamma=self.hparams.lr_decay_rate)
-            elif self.hparams.lr_scheduler == 'cosine':
-                scheduler = lrs.CosineAnnealingLR(optimizer,
-                                                  T_max=self.hparams.lr_decay_steps,
-                                                  eta_min=self.hparams.lr_decay_min_lr)
+            if self.hparams.lr_scheduler == "step":
+                scheduler = lrs.StepLR(
+                    optimizer,
+                    step_size=self.hparams.lr_decay_steps,
+                    gamma=self.hparams.lr_decay_rate,
+                )
+            elif self.hparams.lr_scheduler == "cosine":
+                scheduler = lrs.CosineAnnealingLR(
+                    optimizer,
+                    T_max=self.hparams.lr_decay_steps,
+                    eta_min=self.hparams.lr_decay_min_lr,
+                )
             else:
-                raise ValueError('Invalid lr_scheduler type!')
+                raise ValueError("Invalid lr_scheduler type!")
             return [optimizer], [scheduler]
-
 
     def load_model(self):
         name = self.hparams.model_name
         # Change the `snake_case.py` file name to `CamelCase` class name.
         # Please always name your model file name as `snake_case.py` and
         # class name corresponding `CamelCase`.
-        camel_name = ''.join([i.capitalize() for i in name.split('_')])
+        camel_name = "".join([i.capitalize() for i in name.split("_")])
         try:
-            #Model = getattr(importlib.import_module('.'+name, package=__package__), camel_name)
-            Model = getattr(importlib.import_module('models.'+name), camel_name)
+            # Model = getattr(importlib.import_module('.'+name, package=__package__), camel_name)
+            Model = getattr(importlib.import_module("models." + name), camel_name)
         except:
             raise ValueError(
-                f'Invalid Module File Name or Invalid Class Name {name}.{camel_name}!')
+                f"Invalid Module File Name or Invalid Class Name {name}.{camel_name}!"
+            )
         self.model = self.instancialize(Model)
 
     def load_loss(self):
         name = self.hparams.loss_name
-        camel_name = ''.join([i.capitalize() for i in name.split('_')])
+        camel_name = "".join([i.capitalize() for i in name.split("_")])
         try:
-            #Loss_CLS = getattr(importlib.import_module('..losses.'+name, package=__package__), camel_name)
-            Loss_CLS = getattr(importlib.import_module('losses.'+name), camel_name)
+            # Loss_CLS = getattr(importlib.import_module('..losses.'+name, package=__package__), camel_name)
+            Loss_CLS = getattr(importlib.import_module("losses." + name), camel_name)
         except:
             raise ValueError(
-                f'Invalid Module File Name or Invalid Class Name {name}.{camel_name}!')
+                f"Invalid Module File Name or Invalid Class Name {name}.{camel_name}!"
+            )
         self.loss_func = self.instancialize(Loss_CLS)
 
     def instancialize(self, object_cls, **other_args):
@@ -82,28 +88,34 @@ class PLModelInterface(pl.LightningModule):
         parser = parent_parser.add_argument_group("PLModelTripletInterface")
         parser.add_argument("--model_name", type=str, required=True)
         parser.add_argument("--loss_name", type=str, required=True)
-        parser.add_argument("--lr", type=float, required=True)
+        parser.add_argument("--lr", type=float, default=1e-6)
         parser.add_argument("--lr_scheduler", type=str, default=None)
 
         return parent_parser
 
+
 class PLModelTripletInterface(PLModelInterface):
-    def __init__(self, model_name='bert_encoder', loss_name='triplet_loss', **kwargs):
+    def __init__(self, model_name="bert_encoder", loss_name="triplet_loss", **kwargs):
         super().__init__(model_name, loss_name, **kwargs)
 
     def forward(self, input):
         embeddings = self.model(input)
         return embeddings
-        
+
     def training_step(self, batch, batch_idx):
         token_anchor, token_pos, token_neg = batch
         embed_anchor = self.model(token_anchor)
         embed_pos = self.model(token_pos)
         embed_neg = self.model(token_neg)
         loss = self.loss_func((embed_anchor, embed_pos, embed_neg))
-        self.log('loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return loss
 
-if __name__ == '__main__':
-    model = PLModelTripletInterface(model_name='bert_encoder', loss_name='triplet', pretrained_model_name="distilbert-base-uncased")
+if __name__ == "__main__":
+    model = PLModelTripletInterface(
+        model_name="bert_encoder",
+        loss_name="triplet",
+        pretrained_model_name="distilbert-base-uncased",
+    )
+
