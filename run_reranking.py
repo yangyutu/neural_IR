@@ -66,8 +66,6 @@ def main(args):
             re_rank_result_all.append((int(qid), pid, idx + 1, score))
 
         count += 1
-        if count > 100:
-            break
 
     with open(args.output_file, "w", newline="\n") as tsvfile:
         writer = csv.writer(tsvfile, delimiter="\t")

@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 
 
 def encode_plus(token, tokenizer, max_len=128):
@@ -12,17 +13,21 @@ def encode_plus(token, tokenizer, max_len=128):
     return encoded
 
 
-def batch_inference(model, encodings, device, batch_size=128):
+def batch_inference(
+    model, encodings, device, return_in_cpu_numpy=False, batch_size=128
+):
 
     output = []
-    for start in range(0, len(encodings), batch_size):
+    for start in tqdm(range(0, len(encodings), batch_size)):
         end = start + batch_size
         batch_input = {
             key: [i[key] for i in encodings[start:end]] for key in encodings[0]
         }
         batch_input_cuda = {k: torch.cat(v).to(device) for k, v in batch_input.items()}
         batch_out = model(batch_input_cuda)
-        output.append(batch_out)
+        if return_in_cpu_numpy:
+            output.extend(list(batch_out.cpu().numpy()))
+        else:
+            output.append(batch_out)
 
-    output = torch.cat(output)
     return output
