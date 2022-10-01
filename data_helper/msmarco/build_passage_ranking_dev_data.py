@@ -1,11 +1,13 @@
+import json
+import logging
+import os
+import pickle
+import random
 from argparse import ArgumentParser
-from transformers import AutoTokenizer
+from collections import defaultdict
 
 from tqdm import tqdm
-import json, os, pickle
-from collections import defaultdict
-import logging
-import random
+from transformers import AutoTokenizer
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -27,35 +29,54 @@ def _read_collections(filename):
 
 
 def build_tokenized_data(args):
-    qid_2_query = _read_collections(args.query_collection)
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=True)
+    qid_2_query_all = _read_collections(args.query_collection)
+    pid_2_passage_all = _read_collections(args.passage_collection)
 
-    qid_2_query_token_ids = {}
+    with open(args.query_candidates_path, "r") as file:
+        query_candidates = json.load(file)
 
-    for qid in tqdm(qid_2_query):
-        text = qid_2_query[qid]
-        qid_2_query_token_ids[qid] = tokenizer.encode(
-            text, add_special_tokens=False, max_length=args.truncate, truncation=True
-        )
+    if args.sample_size > 0:
+        random.seed(1)
+        queries = list(query_candidates.keys())
+        random.shuffle(queries)
+        queries = queries[: args.sample_size]
+        query_candidates = {q: query_candidates[q] for q in queries}
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    with open(
+        os.path.join(args.output_dir, "qid_2_top_1000_passage_BM25_subset.json"), "w"
+    ) as file:
+        json.dump(query_candidates, file)
 
-    with open(os.path.join(args.output_dir, "qid_2_query_token_ids.pkl"), "wb") as file:
-        pickle.dump(qid_2_query_token_ids, file)
+    qid_2_query = {}
+    pid_2_passage = {}
+    for qid, candidates in tqdm(query_candidates.items()):
+        for pid in candidates:
+            qid_text = qid_2_query_all[qid]
+            pid_text = pid_2_passage_all[pid]
+            if qid not in qid_2_query:
+                qid_2_query[qid] = qid_text
+            if pid not in pid_2_passage:
+                pid_2_passage[pid] = pid_text
+
+    with open(os.path.join(args.output_dir, "qid_2_query_text.pkl"), "wb") as file:
+        pickle.dump(qid_2_query, file)
+    with open(os.path.join(args.output_dir, "pid_2_passage_text.pkl"), "wb") as file:
+        pickle.dump(pid_2_passage, file)
 
     logger.info(f"done!")
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--tokenizer_name", required=True)
+
+    parser.add_argument("--passage_collection", required=True)
     parser.add_argument("--query_collection", required=True)
-    parser.add_argument("--truncate", type=int, default=128)
+    parser.add_argument("--query_candidates_path", required=True)
+    parser.add_argument("--sample_size", type=int, default=-1)
     parser.add_argument("--output_dir", type=str)
     args = parser.parse_args()
 
     print(args)
-
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
     build_tokenized_data(args)
-

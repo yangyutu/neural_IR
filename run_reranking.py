@@ -11,6 +11,14 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from evaluation.re_ranking import re_rank
 from argparse import ArgumentParser
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
+)
 
 
 def _load_data(args):
@@ -43,6 +51,9 @@ def main(args):
     qid_2_query_token_ids, pid_2_passage_token_ids, query_2_candidates = _load_data(
         args
     )
+
+    logger.info(f"There are {len(query_2_candidates)} queries to run inference!")
+
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=False)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = _load_model(args, device)
@@ -59,6 +70,7 @@ def main(args):
             qid_2_query_token_ids,
             pid_2_passage_token_ids,
             device,
+            args.batch_size
         )
 
         for idx, result in enumerate(re_rank_result):
@@ -67,6 +79,9 @@ def main(args):
 
         count += 1
 
+    logger.info(f"{count} queries have been actually inferenced!")
+    if not os.path.exists(os.path.dirname(args.output_file)):
+        os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
     with open(args.output_file, "w", newline="\n") as tsvfile:
         writer = csv.writer(tsvfile, delimiter="\t")
         for record in re_rank_result_all:
@@ -159,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--re_rank_input_file_path", type=str, required=True)
     parser.add_argument("--tokenizer_name", type=str, required=True)
     parser.add_argument("--model_checkpoint", type=str, required=True)
+    parser.add_argument("--batch_size", type=int, default=256, required=False)    
     parser.add_argument("--output_file", type=str, required=True)
 
     PLModelTripletInterface.add_model_specific_args(parser)

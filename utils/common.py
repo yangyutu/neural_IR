@@ -14,11 +14,11 @@ def encode_plus(token, tokenizer, max_len=128):
 
 
 def batch_inference(
-    model, encodings, device, return_in_cpu_numpy=False, batch_size=128
+    model, encodings, device, return_in_cpu_numpy=False, batch_size=256
 ):
-
+    model.eval()
     output = []
-    for start in tqdm(range(0, len(encodings), batch_size)):
+    for start in range(0, len(encodings), batch_size):
         end = start + batch_size
         batch_input = {
             key: [i[key] for i in encodings[start:end]] for key in encodings[0]

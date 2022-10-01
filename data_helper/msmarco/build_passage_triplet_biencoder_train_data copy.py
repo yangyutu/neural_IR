@@ -14,7 +14,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-
 def _read_collections(filename):
     with open(filename) as f:
         id_2_text = {}
@@ -62,11 +61,12 @@ def build_tokenized_data(args, qid_set, pid_set):
     logger.info(f"done!")
 
 
-def build_triplets(args):
+def read_triplets(args):
 
-    triplets = []
     qid_set = set()
     pid_set = set()
+    triplets = []
+    count = 0
     with open(args.triplet_file) as f:
         for line in f:
             qid, pos_id, neg_id = line.strip().split("\t")
@@ -76,23 +76,14 @@ def build_triplets(args):
             pid_set.add(neg_id)
             # only keep valid triplets
             # if qid in qid_2_query and pos_id in pid_2_passage and neg_id in pid_2_passage:
+            count += 1
 
-    random.shuffle(triplets)
-    sub_sample = 10000000
-    triplets = triplets[:sub_sample]
-
-    logger.info(f"there are {len(triplets)} triplets in the training data")
-
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-
+    logger.info(f"there are {count} triplets in the training data")
     with open(os.path.join(args.output_dir, "triplets.pkl"), "wb") as file:
-        pickle.dump(triplets, file)
-
+            pickle.dump(triplets, file)
     logger.info(f"done triplets!")
 
     return qid_set, pid_set
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -107,6 +98,6 @@ if __name__ == "__main__":
 
     print(args)
 
-    qid_set, pid_set = build_triplets(args)
+    qid_set, pid_set = read_triplets(args)
     build_tokenized_data(args, qid_set, pid_set)
 
