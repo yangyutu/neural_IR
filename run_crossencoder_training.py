@@ -11,7 +11,7 @@ from pytorch_lightning import seed_everything
 from transformers import AutoTokenizer
 
 from dataset.ms_marco_data import MSQDPairTrainDataModule, MSQDEvalDataModule
-from models.cross_encoder import BertCrossEncoder
+from models.cross_encoder_finetune import CrossEncoderFineTune
 
 
 def run(args):
@@ -19,6 +19,7 @@ def run(args):
         project=args.project_name,  # group runs in "MNIST" project
         log_model="all",
         save_dir=args.default_root_dir,
+        tags=[args.pretrained_model_name],
     )  # log all new checkpoints during training
 
     seed_everything(args.seed, workers=True)
@@ -43,7 +44,7 @@ def run(args):
     traindata_loader = train_data_module.train_dataloader()
     valdata_loader = val_data_module.test_dataloader()
 
-    model = BertCrossEncoder(
+    model = CrossEncoderFineTune(
         pretrained_model_name=args.pretrained_model_name,
         num_classes=2,
         truncate=args.max_len,
@@ -51,7 +52,7 @@ def run(args):
     )
 
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=5,
+        save_top_k=3,
         every_n_train_steps=args.model_save_every_n_steps,
         monitor="val_mrr",
         mode="max",
@@ -64,7 +65,6 @@ def run(args):
         devices=args.gpus,
         precision=args.precision,
         val_check_interval=args.model_validate_every_n_steps,
-        num_sanity_val_steps=0,
         limit_train_batches=args.limit_train_batches,
         max_epochs=args.max_epochs,
         default_root_dir=args.default_root_dir,
@@ -85,7 +85,7 @@ def run(args):
 
 
 def debug():
-    model = BertCrossEncoder(
+    model = CrossEncoderFineTune(
         pretrained_model_name="bert-base-uncased",
         num_classes=2,
         truncate=120,
