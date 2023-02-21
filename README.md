@@ -7,30 +7,59 @@ This repository contains a PyTorch framework for training neural based informati
 pip install -r requirements.txt
 ```
 
+## (Update 2023) Experiments for MS MARCO passage reranking task
 
-## Experiments for MS MARCO passage retrieval task
+Re-ranking takes top 1000 candidates from BM25 as the input.
+
+### Training
+
+
+
+
+```
+python run_reranking.py \
+--qid_2_query_token_ids_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/dev_data/qid_2_query_token_ids.pkl \
+--pid_2_passage_token_ids_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/train_data_full/pid_2_passage_token_ids.pkl \
+--re_rank_input_file_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/assets/msmarco/query_2_top_1000_passage_BM25.json \
+--tokenizer_name distilbert-base-uncased \
+--pretrained_model_name distilbert-base-uncased \
+--model_checkpoint /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/lightning_logs/version_12/checkpoints/epoch=1-step=312499.ckpt \
+--model_name bert_encoder \
+--loss_name triplet_loss \
+--output_file ranking.tsv
+```
+
+## Experiments for MS MARCO passage reranking task
 
 ### Data preparation
 
 1) Download from https://microsoft.github.io/msmarco/Datasets
 
 2) Prepare triplet training data
+
+We don't need the full triplet set idpidtriples.train.full.2.tsv for the model to converge. We can sample 3% from it. 
+
+Use /mnt/d/MLData/data/msmarco_passage/data_explorer.ipynb to sample the 
+
+qidpidtriples.train.medium_mixed.2.tsv
+
+Then run the following 
+
 ```
-python data_helepr/msmarco/build_passage_triplet_train_data.py \
---tokenizer_name distilbert-base-uncased \
---triplet_file /home/ubuntu/MLData/work/Repos/NeuralIR/data/qidpidtriples.train.full.2.tsv \
---passage_collection /home/ubuntu/MLData/work/Repos/NeuralIR/data/collectionandqueries/collection.tsv \
---query_collection /home/ubuntu/MLData/work/Repos/NeuralIR/data/collectionandqueries/queries.train.tsv \
---truncate 128 \
---output_dir /home/ubuntu/MLData/work/Repos/NeuralIR/BERTEncoder/experiments/msmarco_psg/train_data
+python data_helper/msmarco/build_passage_triplet_crossencoder_train_data.py \
+--triplet_file /mnt/d/MLData/data/msmarco_passage/triplets/qidpidtriples.train.medium_mixed.2.tsv \
+--passage_collection /mnt/d/MLData/data/msmarco_passage/collection.tsv \
+--query_collection /mnt/d/MLData/data/msmarco_passage/queries/queries.train.tsv \
+--output_dir ./experiments/msmarco_psg_ranking/cross_encoder_triplet_train_data_medium_mixed
 ```
-3) Prepare dev data for validation
+3) Prepare dev data for validation, which has 6980 queries (each query has around ~1000 candidates)
+
 ```
-python build_passage_ranking_dev_data.py \
---tokenizer_name distilbert-base-uncased \
---query_collection /home/ubuntu/MLData/work/Repos/NeuralIR/data/collectionandqueries/queries.dev.small.tsv \
---truncate 128 \
---output_dir /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/dev_data
+python data_helper/msmarco/build_passage_ranking_dev_data.py \
+--passage_collection /mnt/d/MLData/data/msmarco_passage/collection.tsv \
+--query_collection /mnt/d/MLData/data/msmarco_passage/queries.dev.small.tsv \
+--query_candidates_path ./assets/msmarco/query_2_top_1000_passage_BM25.json \
+--output_dir experiments/msmarco_psg_ranking/dev_data_sz_full
 ```
 
 ### Model training and visualization
@@ -101,29 +130,34 @@ python run_retrieval.py \
 
 
 
-### Re-rank 
 
-Re-ranking takes top 1000 candidates from BM25 as the input.
-
-```
-python run_reranking.py \
---qid_2_query_token_ids_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/dev_data/qid_2_query_token_ids.pkl \
---pid_2_passage_token_ids_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/msmarco_psg/train_data_full/pid_2_passage_token_ids.pkl \
---re_rank_input_file_path /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/assets/msmarco/query_2_top_1000_passage_BM25.json \
---tokenizer_name distilbert-base-uncased \
---pretrained_model_name distilbert-base-uncased \
---model_checkpoint /home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR/experiments/lightning_logs/version_12/checkpoints/epoch=1-step=312499.ckpt \
---model_name bert_encoder \
---loss_name triplet_loss \
---output_file ranking.tsv
-```
 
 ### Notebooks for analyzing ranking results
 
 notebooks/Result_analysis.ipynb
 
 
+## Data size stats
 
+### query and passages
 
+collection.tsv has 8,841,823 passages. One example is
 
+queries.train.tsv has 808,731 (qid, query_text) rows 
 
+qrels.train.tsv has 532761 (qid, iter, pid, label) rows for positive passages associated with each qid. Among them, we have 502939 distinct qids.
+
+queries_dev.tsv has 101,093 (qid, query_text) rows 
+
+qrels.dev.tsv has 59273 (qid, iter, pid, label) rows for positive passages associated with each qid
+
+### Triplet training data
+
+qidpidtriples.train.full.2.tsv has 397,768,673 rows
+
+It has 400782 distinct qids, which is a subset of 502939 qids
+
+Note that to train a cross-encoder to reranking, we typically only need a small fraction of qidpidtriples.train.full.2.tsv.
+
+For example, 
+qidpidtriples.train.medium_mixed.2.tsv has 11933060 rows (3% of the full training triplets), 395465 distinct qids, and 5464050 distinct pid

@@ -7,9 +7,9 @@ import wandb
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning.loggers.wandb import WandbLogger
+from pytorch_lightning import seed_everything
 from transformers import AutoTokenizer
 
-# sys.path.append("/home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR")
 from dataset.ms_marco_data import MSQDPairTrainDataModule, MSQDEvalDataModule
 from models.cross_encoder import BertCrossEncoder
 
@@ -20,6 +20,8 @@ def run(args):
         log_model="all",
         save_dir=args.default_root_dir,
     )  # log all new checkpoints during training
+
+    seed_everything(args.seed, workers=True)
 
     train_data_module = MSQDPairTrainDataModule(
         args.train_triplet_path,
@@ -72,6 +74,7 @@ def run(args):
             lr_monitor,
         ],
         logger=wandb_logger,
+        deterministic=True,
     )
 
     # trainer.validate(model, valdata_loader)
@@ -83,8 +86,7 @@ def run(args):
 
 def debug():
     model = BertCrossEncoder(
-        pretrained_model_name="distilbert-base-uncased",
-        hidden_dim=768,
+        pretrained_model_name="bert-base-uncased",
         num_classes=2,
         truncate=120,
     )
@@ -93,7 +95,20 @@ def debug():
     pid_2_passage_path = os.path.join(data_root, "pid_2_passage_text.pkl")
     qid_2_query_path = os.path.join(data_root, "qid_2_query_text.pkl")
     triplet_path = os.path.join(data_root, "triplets.pkl")
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased", use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=False)
+
+    train_data_module = MSQDPairTrainDataModule(
+        triplet_path,
+        qid_2_query_path,
+        pid_2_passage_path,
+        batch_size=32,
+    )
+    traindata_loader = train_data_module.train_dataloader()
+
+    for batch in traindata_loader:
+        model.cuda()
+        model.training_step(batch)
+        break
 
 
 def parse_arguments():
@@ -101,6 +116,7 @@ def parse_arguments():
     parser = ArgumentParser()
 
     # trainer specific arguments
+    parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--gpus", type=int, required=True)
     parser.add_argument("--precision", type=int, default=16)
     parser.add_argument("--limit_train_batches", type=float, default=1.0)
@@ -108,6 +124,7 @@ def parse_arguments():
     parser.add_argument("--progress_bar_refresh_rate", type=int, default=5)
     parser.add_argument("--model_save_every_n_steps", type=int, default=25000)
     parser.add_argument("--model_validate_every_n_steps", type=int, default=25000)
+
     parser.add_argument("--project_name", type=str, required=True)
     parser.add_argument("--default_root_dir", type=str, required=True)
 
@@ -133,7 +150,7 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
-    #    debug()
+    # debug()
     args = parse_arguments()
     run(args)
 #    print(vars(args))

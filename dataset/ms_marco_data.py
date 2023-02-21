@@ -20,6 +20,36 @@ def text_pair_collate_fn(data):
     return list(text_pairs), torch.tensor(labels).long()
 
 
+def text_triplet_in_batch_negs_collate_fn(batch):
+    """
+    data: is a list of dictionary with (example, label, length)
+          where 'example' is a tensor of arbitrary shape
+          and label/length are scalars
+    """
+    # a list of dict to a dict of list
+    batch = {k: [dic[k] for dic in batch] for k in batch[0]}
+    qid_text_list = batch["qid_text"]
+    pid_text_list = batch["pid_text_pos"] + batch["pid_text_neg"]
+    pid_list = batch["pid_pos"] + batch["pid_neg"]
+
+    # note that according to the convention of Multi label margin loss, target label is placed in front and then padded with -1
+    # https://pytorch.org/docs/stable/generated/torch.nn.MultiLabelMarginLoss.html
+    labels = [[-1] * len(pid_list) for _ in range(len(batch["qid"]))]
+    for i in range(len(batch["qid"])):
+        count = 0
+        for j in range(len(pid_list)):
+            if pid_list[j] == batch["qrel"][i]:
+                labels[i][count] = j
+                count += 1
+    labels = []
+    for i in range(len(batch["qid"])):
+        for j in range(len(pid_list)):
+            if pid_list[j] == batch["qrel"][i]:
+                labels.append(j)
+    labels = list(range(len(batch["qid"])))
+    return qid_text_list, pid_text_list, torch.LongTensor(labels)
+
+
 def text_pair_collate_fn_with_qd_id(data):
     """
     data: is a list of tuples with (example, label, length)
@@ -29,6 +59,43 @@ def text_pair_collate_fn_with_qd_id(data):
     qd_ids, text_pairs, labels = zip(*data)
 
     return list(qd_ids), list(text_pairs), torch.tensor(labels).long()
+
+
+class MSQDTripletTrainDataModule(pl.LightningDataModule):
+    def __init__(
+        self,
+        triplet_path: str,
+        query_path: str,
+        passage_path: str,
+        batch_size: int = 64,
+        num_workers: int = 8,
+        collate_fn=text_pair_collate_fn,
+    ):
+        super().__init__()
+        self.triplet_path = triplet_path
+        self.query_path = query_path
+        self.passage_path = passage_path
+
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.collate_fn = collate_fn
+
+        self.setup()
+
+    def setup(self, stage: Optional[str] = None):
+        self.ms_qd_triplet_data_train = MSQDTripletTextData(
+            self.triplet_path, self.query_path, self.passage_path
+        )
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.ms_qd_triplet_data_train,
+            shuffle=True,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+            collate_fn=text_triplet_in_batch_negs_collate_fn,
+        )
 
 
 class MSQDPairTrainDataModule(pl.LightningDataModule):
@@ -53,7 +120,7 @@ class MSQDPairTrainDataModule(pl.LightningDataModule):
         self.setup()
 
     def setup(self, stage: Optional[str] = None):
-        self.ms_qd_pair_data_train = MSQDPairData(
+        self.ms_qd_pair_data_train = MSQDPairTextData(
             self.triplet_path, self.query_path, self.passage_path
         )
 
@@ -108,7 +175,7 @@ class MSQDEvalDataModule(pl.LightningDataModule):
         )
 
 
-class MSQDPairData(Dataset):
+class MSQDPairTextData(Dataset):
     def __init__(self, triplet_path: str, query_path: str, passage_path: str):
         super().__init__()
         self.triplet_path = triplet_path
@@ -144,6 +211,54 @@ class MSQDPairData(Dataset):
         pid_text = self.pid_2_passage[pid]
 
         return [qid_text, pid_text], label
+
+
+class MSQDTripletTextData(Dataset):
+    def __init__(
+        self,
+        triplet_path: str,
+        query_path: str,
+        passage_path: str,
+        # qrels_path: str,
+    ):
+        super().__init__()
+        self.triplet_path = triplet_path
+        # self.qrels_path = qrels_path
+        self.query_path = query_path
+        self.passage_path = passage_path
+        # self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=False)
+        # self.max_len = max_len
+        self._load_data()
+
+    def _load_data(self):
+
+        with open(self.triplet_path, "rb") as file:
+            self.triplets = pickle.load(file)
+
+        with open(self.query_path, "rb") as file:
+            self.qid_2_query = pickle.load(file)
+
+        with open(self.passage_path, "rb") as file:
+            self.pid_2_passage = pickle.load(file)
+
+    def __len__(self):
+        return len(self.triplets)
+
+    def __getitem__(self, index: int):
+
+        qid, pid_pos, pid_neg = self.triplets[index]
+        qid_text = self.qid_2_query[qid]
+        pid_text_pos = self.pid_2_passage[pid_pos]
+        pid_text_neg = self.pid_2_passage[pid_neg]
+        return {
+            "qid_text": qid_text,
+            "pid_text_pos": pid_text_pos,
+            "pid_text_neg": pid_text_neg,
+            "qid": qid,
+            "pid_pos": pid_pos,
+            "pid_neg": pid_neg,
+            "qrel": pid_pos,
+        }
 
 
 class MSQDRankEvalData(Dataset):
@@ -196,6 +311,46 @@ class MSQDRankEvalData(Dataset):
         return [qid, pid, label], [qid_text, pid_text], label
 
 
+class MSTripletTextData(Dataset):
+    def __init__(
+        self,
+        triplet_path: str,
+        query_path: str,
+        passage_path: str,
+        max_len: int = 128,
+    ):
+        super().__init__()
+        self.triplet_path = triplet_path
+        self.passage_path = passage_path
+        self.query_path = query_path
+        self.max_len = max_len
+        self._load_data()
+
+    def _load_data(self):
+
+        with open(self.triplet_path, "rb") as file:
+            self.triplets = pickle.load(file)
+
+        with open(self.passage_path, "rb") as file:
+            self.pid_2_passage = pickle.load(file)
+
+        with open(self.query_path, "rb") as file:
+            self.qid_2_query = pickle.load(file)
+
+    def __len__(self):
+        return len(self.triplets)
+
+    def __getitem__(self, index: int):
+
+        qid, pos_id, neg_id = self.triplets[index]
+
+        qid_text = self.qid_2_query[qid]
+        pos_text = self.pid_2_passage[pos_id]
+        neg_text = self.pid_2_passage[neg_id]
+
+        return [qid_text, pos_text, neg_text]
+
+
 class MSTripletData(Dataset):
     def __init__(
         self,
@@ -209,7 +364,7 @@ class MSTripletData(Dataset):
         self.triplet_path = triplet_path
         self.pid_2_passage_token_ids_path = pid_2_passage_token_ids_path
         self.qid_2_query_token_ids_path = qid_2_query_token_ids_path
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=False)
+        # self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=False)
         self.max_len = max_len
         self._load_data()
 
@@ -349,17 +504,20 @@ if __name__ == "__main__":
     pid_2_passages_path = os.path.join(data_root, "pid_2_passage_text.pkl")
     qid_2_query_path = os.path.join(data_root, "qid_2_query_text.pkl")
     triplet_path = os.path.join(data_root, "triplets.pkl")
+    # qrels_path = os.path.join(data_root, "qrels.pkl")
     tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased", use_fast=False)
 
-    dataset = MSQDPairData(triplet_path, qid_2_query_path, pid_2_passages_path)
+    dataset = MSQDPairTextData(triplet_path, qid_2_query_path, pid_2_passages_path)
+
+    dataset = MSQDTripletTextData(triplet_path, qid_2_query_path, pid_2_passages_path)
 
     print(dataset[0])
 
     data_loader = get_data_loader(
-        dataset, batch_size=4, collate_fn=text_pair_collate_fn
+        dataset, batch_size=4, collate_fn=text_triplet_in_batch_negs_collate_fn
     )
 
     for batch in data_loader:
-        text_pairs, label = batch
-        encoded = tokenizer(text_pairs)
+        text = batch
+        # encoded = tokenizer(text_pairs)
         break

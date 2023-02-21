@@ -1,20 +1,18 @@
 import collections
-from statistics import mean
 
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from torch import optim
 from torch.optim.lr_scheduler import LambdaLR
-from transformers import AutoModel, AutoTokenizer
 from torchmetrics import RetrievalMRR, RetrievalRecall
+from transformers import AutoModel, AutoTokenizer
 
 
 class BertBiEncoder(pl.LightningModule):
     def __init__(
         self,
         pretrained_model_name,
-        num_classes,
         truncate,
         lr=1e-6,
         warm_up_step=10000,
@@ -102,8 +100,10 @@ class BertBiEncoder(pl.LightningModule):
     def validation_step(self, batch, batch_idx=0):
         qd_ids, input_text_pairs, labels = batch
         query_text_list, doc_text_list = zip(*input_text_pairs)
-        query_embeddings = self.model_forward(list(query_text_list), token_type_id=0)
-        doc_embeddings = self.model_forward(list(doc_text_list), token_type_id=1)
+        query_embeddings = self.compute_embeddings(
+            list(query_text_list), token_type_id=0
+        )
+        doc_embeddings = self.compute_embeddings(list(doc_text_list), token_type_id=1)
         similarities = torch.sum(query_embeddings * doc_embeddings, dim=1)
 
         for qd_id, sim_score in zip(qd_ids, similarities):

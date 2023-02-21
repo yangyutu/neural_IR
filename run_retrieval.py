@@ -1,93 +1,63 @@
-import os
 import csv
-from models.model_interface import PLModelTripletInterface
-from models.bert_encoder import BertEncoder
-from losses.triplet_loss import TripletLoss
-from transformers import AutoTokenizer
-import pytorch_lightning as pl
-import pickle, json
-import torch
-import torch.nn.functional as F
-from tqdm import tqdm
-from indexing.faiss_index import search_faiss_index
+import pickle
+import time
 from argparse import ArgumentParser
-from utils.common import encode_plus
+
 import faiss
+import numpy as np
+import torch
+from tqdm import tqdm
+from transformers import AutoTokenizer
 
-
-def _load_data(args):
-
-    with open(args.qid_2_query_token_ids_path, "rb") as file:
-        qid_2_query_token_ids = pickle.load(file)
-
-    with open(args.pid_2_embedding_path, "rb") as file:
-        pid_2_embedding = pickle.load(file)
-
-    return qid_2_query_token_ids, list(pid_2_embedding.keys())
-
-
-def _load_model(args):
-
-    model = PLModelTripletInterface(**vars(args))
-    model.load_from_checkpoint(args.model_checkpoint)
-    checkpoint = torch.load(args.model_checkpoint)
-    model.load_state_dict(checkpoint["state_dict"])
-    model.freeze()
-    return model
+from indexing.faiss_index import (
+    construct_flatindex_from_embeddings,
+    convert_index_to_gpu,
+    index_retrieve,
+)
 
 
 def main(args):
+    with open(args.id_2_doc_embed_filename, "rb") as file:
+        id_2_doc_embeds = pickle.load(file)
 
-    qid_2_query_token_ids, id_2_pid = _load_data(args)
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=False)
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model = _load_model(args)
-    index = faiss.read_index(args.index_save_path)
-    retrieval_result_all = []
-    count = 0
-    for qid in tqdm(qid_2_query_token_ids):
-        qid_encoded = encode_plus(qid_2_query_token_ids[qid], tokenizer)
-        qid_embed = model(qid_encoded).numpy()
-        # print(qid_embed.shape)
-        retrieval_result = search_faiss_index(
-            qid_embed, index, args.number_nearest_neighbors,
+    with open(args.id_2_query_embed_filename, "rb") as file:
+        id_2_query_embeds = pickle.load(file)
+
+    doc_ids, doc_embeds = zip(*id_2_doc_embeds.items())
+    query_ids, query_embeds = zip(*id_2_query_embeds.items())
+
+    start = time.time()
+    index = construct_flatindex_from_embeddings(np.array(doc_embeds), np.array(doc_ids))
+    if args.faiss_gpu_id >= 0:
+        gpu_index = convert_index_to_gpu(
+            index=index, faiss_gpu_index=args.faiss_gpu_id, useFloat16=True
         )
-        # print(retrieval_result)
-        embed_ids, dists = retrieval_result
-        for idx, result in enumerate(zip(embed_ids[0], dists[0])):
-            embed_id, dist = result
-            pid = id_2_pid[embed_id]
-            retrieval_result_all.append((int(qid), pid, idx + 1, dist))
+    print(f"index construction time: {time.time() - start}")
 
-        # print(retrieval_result_all)
+    nearest_nbs = index_retrieve(index, np.array(query_embeds), topk=1000, batch=128)
 
-        count += 1
-        # if count > 0:
-        #     break
+    with open(args.output_rank_file_path, "w") as outputfile:
+        for qid, nb_list in zip(query_ids, nearest_nbs):
+            for idx, nb_id in enumerate(nb_list):
+                outputfile.write(f"{qid}\t{nb_id}\t{idx + 1}\n")
 
-    with open(args.output_file, "w", newline="\n") as tsvfile:
-        writer = csv.writer(tsvfile, delimiter="\t")
-        for record in retrieval_result_all:
-            writer.writerow(record)
 
-    print("done")
+def parse_arguments():
+
+    parser = ArgumentParser()
+    parser.add_argument("--id_2_query_embed_filename", type=str, required=True)
+    parser.add_argument("--id_2_doc_embed_filename", type=str, required=True)
+    parser.add_argument("--topk", type=int, default=1000)
+    parser.add_argument("--faiss_gpu_id", type=int, default=-1)
+    parser.add_argument(
+        "--output_rank_file_path", type=str, default="./retrieval_rank.tsv"
+    )
+
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == "__main__":
 
-    parser = ArgumentParser()
-    parser.add_argument("--qid_2_query_token_ids_path", type=str, required=True)
-    parser.add_argument("--pid_2_embedding_path", type=str, required=True)
-    parser.add_argument("--tokenizer_name", type=str, required=True)
-    parser.add_argument("--model_checkpoint", type=str, required=True)
-    parser.add_argument("--index_save_path", type=str, required=True)
-    parser.add_argument("--number_nearest_neighbors", type=int, required=True)
-    parser.add_argument("--output_file", type=str, required=True)
-
-    PLModelTripletInterface.add_model_specific_args(parser)
-    BertEncoder.add_model_specific_args(parser)
-    TripletLoss.add_loss_specific_args(parser)
-    args = parser.parse_args()
-
-    print(vars(args))
+    args = parse_arguments()
     main(args)
