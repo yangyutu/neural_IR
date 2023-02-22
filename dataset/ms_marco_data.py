@@ -50,6 +50,18 @@ def text_triplet_in_batch_negs_collate_fn(batch):
     return qid_text_list, pid_text_list, torch.LongTensor(labels)
 
 
+def text_triplet_collate_fn(batch):
+    """
+    data: is a list of dictionary with (example, label, length)
+          where 'example' is a tensor of arbitrary shape
+          and label/length are scalars
+    """
+    # a list of dict to a dict of list
+    batch = {k: [dic[k] for dic in batch] for k in batch[0]}
+
+    return batch["qid_text"], batch["pid_text_pos"], batch["pid_text_neg"]
+
+
 def text_pair_collate_fn_with_qd_id(data):
     """
     data: is a list of tuples with (example, label, length)
@@ -94,7 +106,7 @@ class MSQDTripletTrainDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
-            collate_fn=text_triplet_in_batch_negs_collate_fn,
+            collate_fn=text_triplet_collate_fn,
         )
 
 
@@ -505,9 +517,9 @@ if __name__ == "__main__":
     qid_2_query_path = os.path.join(data_root, "qid_2_query_text.pkl")
     triplet_path = os.path.join(data_root, "triplets.pkl")
     # qrels_path = os.path.join(data_root, "qrels.pkl")
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased", use_fast=False)
+    # tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased", use_fast=False)
 
-    dataset = MSQDPairTextData(triplet_path, qid_2_query_path, pid_2_passages_path)
+    # dataset = MSQDPairTextData(triplet_path, qid_2_query_path, pid_2_passages_path)
 
     dataset = MSQDTripletTextData(triplet_path, qid_2_query_path, pid_2_passages_path)
 
@@ -519,5 +531,6 @@ if __name__ == "__main__":
 
     for batch in data_loader:
         text = batch
+        print(text)
         # encoded = tokenizer(text_pairs)
         break

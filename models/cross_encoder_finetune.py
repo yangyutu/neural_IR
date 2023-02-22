@@ -1,5 +1,5 @@
 import collections
-
+from typing import Dict
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -16,8 +16,7 @@ class CrossEncoderFineTune(pl.LightningModule):
         pretrained_model_name,
         truncate,
         num_classes=2,
-        lr=1e-6,
-        warm_up_step=10000,
+        config: Dict = [],
     ):
         super().__init__()
         self.cross_encoder = AutoModel.from_pretrained(pretrained_model_name)
@@ -27,8 +26,7 @@ class CrossEncoderFineTune(pl.LightningModule):
         self.linear = nn.Linear(self.cross_encoder.config.hidden_size, num_classes)
         self.truncate = truncate
         self.loss_func = nn.CrossEntropyLoss()
-        self.lr = lr
-        self.warm_up_step = warm_up_step
+        self.save_hyperparameters()
 
     def model_forward(self, input_text_pairs):
 
@@ -104,39 +102,9 @@ class CrossEncoderFineTune(pl.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
-    # with linear rate warm up
-    # https://github.com/Lightning-AI/lightning/issues/328
-    # def optimizer_step(self, epoch_nb, batch_nb, optimizer, optimizer_i, opt_closure):
-    #     if self.trainer.global_step < self.warm_up_step:
-    #         lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.warm_up_step)
-    #         for pg in optimizer.param_groups:
-    #             pg["lr"] = lr_scale * self.lr
-
-    #     optimizer.step()
-    #     optimizer.zero_grad()
-
-    # def configure_optimizers(self):
-    #     optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-
-    #     def lr_foo(epoch):
-    #         if epoch < self.warm_up_step:
-    #             # warm up lr
-    #             lr_scale = 0.1 ** (self.warm_up_step - epoch)
-    #         else:
-    #             lr_scale = 0.95 ** epoch
-
-    #         return lr_scale
-
-    #     scheduler = LambdaLR(
-    #         optimizer,
-    #         lr_lambda=lr_foo
-    #     )
-
-    #     return [optimizer], [scheduler]
-
 
 if __name__ == "__main__":
-    model = BertCrossEncoder(
+    model = CrossEncoderFineTune(
         pretrained_model_name="distilbert-base-uncased",
         num_classes=2,
         truncate=120,

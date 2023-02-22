@@ -4,19 +4,10 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 import wandb
-from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning.loggers.wandb import WandbLogger
-from transformers import AutoTokenizer
 
-# sys.path.append("/home/ubuntu/MLData/work/Repos/NeuralIR/neural_IR")
-from dataset.ms_marco_data import (
-    MSQDPairData,
-    MSTripletData,
-    get_data_loader,
-    text_pair_collate_fn,
-)
-from models.cross_encoder import BertCrossEncoder
+from models.cross_encoder_finetune import CrossEncoderFineTune
 from dataset.ms_marco_data import MSQDEvalDataModule
 
 
@@ -38,7 +29,7 @@ def run(args):
     )
     data_loader = data_module.test_dataloader()
 
-    model = BertCrossEncoder(
+    model = CrossEncoderFineTune(
         pretrained_model_name=args.pretrained_model_name,
         num_classes=2,
         truncate=args.max_len,
@@ -81,7 +72,7 @@ def debug():
     #     break
 
     model_checkpoint = "artifacts/model-2zhakltb:v3/model.ckpt"
-    model = BertCrossEncoder(
+    model = CrossEncoderFineTune(
         pretrained_model_name="bert-base-uncased", num_classes=2, truncate=120
     )
 
