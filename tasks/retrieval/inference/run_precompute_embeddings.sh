@@ -14,7 +14,7 @@ python tasks/retrieval/inference/run_precompute_embeddings.py \
 
 # may take ~1hr for small model like microsoft/MiniLM-L12-H384-uncased
 python tasks/retrieval/inference/run_precompute_embeddings.py \
---input_filename /mnt/d/MLData/data/msmarco_passage/collection_dev_only.tsv \
+--input_filename /mnt/d/MLData/data/msmarco_passage/collection.tsv \
 --output_filename ./experiments/precomputed_embeddings/doc_embed.pkl \
 --pretrained_model_name ${pretrained_model_name} \
 --model_checkpoint ${model_checkpoint} \
