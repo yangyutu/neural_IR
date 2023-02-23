@@ -1,8 +1,3 @@
-import os
-import csv
-from models.model_interface import PLModelTripletInterface
-from models.bert_encoder import BertEncoder
-from losses.triplet_loss import TripletLoss
 from transformers import AutoTokenizer
 import pytorch_lightning as pl
 import pickle, json
