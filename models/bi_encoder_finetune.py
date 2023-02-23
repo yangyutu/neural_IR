@@ -13,19 +13,18 @@ from losses.multiple_negative_ranking_loss import MultipleNegativesRankingLoss
 class BiEncoderFineTune(pl.LightningModule):
     def __init__(
         self,
-        pretrained_model_name,
         query_encoder: nn.Module,
         doc_encoder: nn.Module,
-        truncate,
         config: Dict = [],
     ):
         super().__init__()
         self.query_encoder = query_encoder
         self.doc_encoder = doc_encoder
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name, use_fast=True
-        )
-        self.truncate = truncate
+        self.config = config
+        # self.tokenizer = AutoTokenizer.from_pretrained(
+        #     pretrained_model_name, use_fast=True
+        # )
+        # self.truncate = truncate
         # self.loss_func = nn.MultiLabelMarginLoss()
         # self.loss_func = nn.MultiMarginLoss()
         self.loss_func = MultipleNegativesRankingLoss()
@@ -91,15 +90,28 @@ class BiEncoderFineTune(pl.LightningModule):
 
         query_text_list, pos_doc_text_list, neg_doc_text_list = batch
         # for query, we use token type id 0; for doc, we use token type id 1
-        query_embeddings = self.query_encoder.encode(query_text_list, token_type_id=0)
-        pos_doc_embeddings = self.doc_encoder.encode(pos_doc_text_list, token_type_id=1)
-        neg_doc_embeddings = self.doc_encoder.encode(neg_doc_text_list, token_type_id=1)
+        query_embeddings = self.query_encoder.encode(
+            query_text_list, device=self.device, token_type_id=0
+        )
+        pos_doc_embeddings = self.doc_encoder.encode(
+            pos_doc_text_list, device=self.device, token_type_id=1
+        )
+        neg_doc_embeddings = self.doc_encoder.encode(
+            neg_doc_text_list, device=self.device, token_type_id=1
+        )
 
         all_embeddings = [query_embeddings, pos_doc_embeddings, neg_doc_embeddings]
 
         loss = self.loss_func(all_embeddings)
 
-        self.log("loss", loss.item(), on_step=True, on_epoch=True, prog_bar=True)
+        self.log(
+            "loss",
+            loss.item(),
+            batch_size=len(query_text_list),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+        )
         return loss
 
     def on_validation_epoch_start(self) -> None:
@@ -112,10 +124,12 @@ class BiEncoderFineTune(pl.LightningModule):
     def validation_step(self, batch, batch_idx=0):
         qd_ids, input_text_pairs, labels = batch
         query_text_list, doc_text_list = zip(*input_text_pairs)
-        query_embeddings = self.compute_embeddings(
-            list(query_text_list), token_type_id=0
+        query_embeddings = self.query_encoder.encode(
+            list(query_text_list), device=self.device, token_type_id=0
         )
-        doc_embeddings = self.compute_embeddings(list(doc_text_list), token_type_id=1)
+        doc_embeddings = self.doc_encoder.encode(
+            list(doc_text_list), device=self.device, token_type_id=1
+        )
         similarities = torch.sum(query_embeddings * doc_embeddings, dim=1)
 
         for qd_id, sim_score in zip(qd_ids, similarities):
@@ -147,7 +161,7 @@ class BiEncoderFineTune(pl.LightningModule):
         return mrr
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = optim.Adam(self.parameters(), lr=self.config.get("lr", 1e-6))
         return optimizer
 
 
