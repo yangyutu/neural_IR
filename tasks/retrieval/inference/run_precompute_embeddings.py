@@ -41,7 +41,7 @@ class MSMARCO_TextDataset(Dataset):
 
 
 def _generate_embeddings(
-    input_filename, output_filename, model, batch_size, num_workers, device="cuda"
+    input_filename, output_filename, model, batch_size, num_workers=24, device="cuda"
 ):
 
     text_dataset = MSMARCO_TextDataset(input_filename)
@@ -59,13 +59,17 @@ def _generate_embeddings(
     for batch in tqdm(dataloader, desc="Evaluating"):
         model.eval()
         with torch.no_grad():
-            output = model.compute_embeddings(batch["text"])
+            if args.query:
+                output = model.compute_query_embeddings(batch["text"])
+            else:
+                output = model.compute_doc_embeddings(batch["text"])
             sequence_embeddings = output.detach().cpu().numpy()
         for id, embed in zip(batch["id"], sequence_embeddings):
             id_2_embeds[id] = embed
     end = timer()
     print("time:", end - start)
 
+    os.makedirs(os.path.dirname(output_filename), exist_ok=True)
     with open(output_filename, "wb") as file:
         pickle.dump(id_2_embeds, file)
 
@@ -92,6 +96,9 @@ def parse_arguments():
     parser.add_argument("--input_filename", type=str, required=True)
     parser.add_argument("--output_filename", type=str, required=True)
     parser.add_argument("--pretrained_model_name", type=str, required=True)
+    parser.add_argument("--query", action="store_true")
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--num_workers", type=int, default=24)
     parser.add_argument("--model_checkpoint", type=str, required=True)
     parser.add_argument("--truncate", type=int, required=True)
 
