@@ -86,6 +86,16 @@ class BiEncoderFineTune(pl.LightningModule):
 
     #     return embeddings
 
+    def compute_query_embeddings(self, input_text_list):
+        return self.query_encoder.encode(
+            input_text_list, device=self.device, token_type_id=0
+        )
+
+    def compute_doc_embeddings(self, input_text_list):
+        return self.query_encoder.encode(
+            input_text_list, device=self.device, token_type_id=1
+        )
+
     def training_step(self, batch, batch_idx=0):
 
         query_text_list, pos_doc_text_list, neg_doc_text_list = batch
