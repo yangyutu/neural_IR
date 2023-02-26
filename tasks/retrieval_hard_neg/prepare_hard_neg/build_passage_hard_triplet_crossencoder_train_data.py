@@ -151,7 +151,7 @@ def gen_static_hardnegs(args, retrieval_results, triplets):
             new_triplets.append((qid, pid_pos, hard_neg))
 
     print(f"there are {len(new_triplets)} new triplets in the training data")
-    with open(os.path.join(args.output_dir, "hard_neg_triplets.pkl"), "wb") as file:
+    with open(os.path.join(args.output_dir, "triplets.pkl"), "wb") as file:
         pickle.dump(new_triplets, file)
     print(f"done triplets!")
     return new_triplets

@@ -1,4 +1,4 @@
-train_data_root=./experiments/msmarco_psg_ranking/cross_encoder_triplet_train_data_medium_mixed/
+train_data_root=./experiments/msmarco_psg_ranking/cross_encoder_triplet_train_data_medium_mixed_hardneg/
 val_data_root=./experiments/msmarco_psg_ranking/dev_data_sz_1000/
 pretrained_model_name="bert-base-uncased"
 pretrained_model_name="sentence-transformers/msmarco-distilbert-base-v4"
@@ -6,7 +6,7 @@ pretrained_model_name="microsoft/MiniLM-L12-H384-uncased"
 #bert-base-uncased
 #sentence-transformers/msmarco-distilbert-base-v4
 export CUDA_VISIBLE_DEVICES="0"
-python run_biencoder_training.py \
+python tasks/retrieval/training/run_biencoder_training.py \
 --gpus 1 \
 --limit_train_batches 1.0 \
 --max_epochs 3 \
@@ -26,6 +26,6 @@ python run_biencoder_training.py \
 --val_qrels_path ./assets/msmarco/query_2_groundtruth_passage_small.json \
 --max_len 128 \
 --project_name biencoder_retrieval_MSMARCO_bert \
---tag static_hard_neg
+--tag static_hard_neg \
 --default_root_dir ./experiments/msmarco_psg_ranking/logs 2>&1 | tee run_bi_encoder_rerank_training.log
 echo $! > save_pid.txt

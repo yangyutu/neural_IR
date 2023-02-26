@@ -90,54 +90,10 @@ def run(args):
         logger=wandb_logger,
         deterministic=True,
     )
-
     trainer.validate(model, valdata_loader)
     trainer.fit(
         model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
     )
-
-
-def debug():
-    model = BiEncoderFineTune(
-        # pretrained_model_name="bert-base-uncased",
-        pretrained_model_name="sentence-transformers/msmarco-distilbert-base-v4",
-        truncate=120,
-    )
-
-    data_root = "/mnt/d/MLData/Repos/neural_IR/experiments/msmarco_psg_ranking/cross_encoder_triplet_train_data_tiny"
-    pid_2_passage_path = os.path.join(data_root, "pid_2_passage_text.pkl")
-    qid_2_query_path = os.path.join(data_root, "qid_2_query_text.pkl")
-    triplet_path = os.path.join(data_root, "triplets.pkl")
-    # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=False)
-
-    train_data_module = MSQDTripletTrainDataModule(
-        triplet_path,
-        qid_2_query_path,
-        pid_2_passage_path,
-        batch_size=32,
-    )
-    traindata_loader = train_data_module.train_dataloader()
-
-    # for batch in traindata_loader:
-    #     model.cuda()
-    #     model.training_step(batch)
-    #     break
-    default_root_dir = "./experiments/msmarco_psg_ranking/logs"
-    trainer = pl.Trainer(
-        accelerator="gpu",
-        devices=1,
-        precision=16,
-        # num_sanity_val_steps=0,
-        limit_train_batches=1.0,
-        max_epochs=3,
-        default_root_dir=default_root_dir,
-        callbacks=[
-            TQDMProgressBar(refresh_rate=20),
-        ],
-        deterministic=True,
-    )
-
-    trainer.fit(model, train_dataloaders=traindata_loader)
 
 
 def parse_arguments():
