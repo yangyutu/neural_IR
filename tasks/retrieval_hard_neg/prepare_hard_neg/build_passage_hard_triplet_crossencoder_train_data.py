@@ -47,6 +47,10 @@ def search_from_index_mp(args, qids_set):
 
     print(f"start retrievaling for {len(qids_set)} queries")
     index = faiss.read_index(args.index_save_path)
+
+    if args.nprobe > 0:
+        index.nprobe = args.nprobe
+
     query_embeddings = _load_embedding_data(args)
 
     query_embeddings = {qid: query_embeddings[qid] for qid in qids_set}
@@ -62,11 +66,14 @@ def search_from_index_mp(args, qids_set):
     retrieval_results = {}
     search_results = pool.map(_search, range(len(query_embeddings_np)))
     for qid_key, result in zip(query_embeddings.keys(), search_results):
+        result = [str(res) for res in result]
         retrieval_results[qid_key] = result
 
     os.makedirs(os.path.dirname(args.retrival_output_path), exist_ok=True)
     with open(args.retrival_output_path, "w") as file:
         json.dump(retrieval_results, file)
+
+    print("done retrieval!")
 
     return retrieval_results
 
@@ -83,12 +90,14 @@ def _read_collections(filename):
 
 
 def build_training_data(args, triplets):
+
+    print("building final training data!")
     qid_2_query_all = _read_collections(args.query_collection)
     pid_2_passage_all = _read_collections(args.passage_collection)
 
     qid_2_query = {}
     pid_2_passage = {}
-    for qid, pos_pid, neg_pid in tqdm(triplets):
+    for qid, pos_pid, neg_pid in tqdm.tqdm(triplets):
         qid_text = qid_2_query_all[qid]
         pos_pid_text = pid_2_passage_all[pos_pid]
         neg_pid_text = pid_2_passage_all[neg_pid]
@@ -118,7 +127,9 @@ def read_triplets(args):
             distinct_qids.add(qid)
             triplets.append((qid, pos_id, neg_id))
             count += 1
-
+    print(
+        f"there are {len(triplets)} input triplets and distinct {len(distinct_qids)} queries!"
+    )
     return triplets, distinct_qids
 
 
@@ -155,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--qrel_path", type=str, required=True)
     parser.add_argument("--topk", type=int, required=True)
     parser.add_argument("--index_save_path", required=True)
+    parser.add_argument("--nprobe", type=int, default=-1)
     parser.add_argument("--retrival_output_path", type=str)
     parser.add_argument("--output_dir", type=str)
     parser.add_argument("--num_proc", type=int, default=24)
@@ -168,4 +180,4 @@ if __name__ == "__main__":
     triplets, distict_qids = read_triplets(args)
     retrieval_results = search_from_index_mp(args, distict_qids)
     hard_triplets = gen_static_hardnegs(args, retrieval_results, triplets)
-    build_training_data(args, triplets)
+    build_training_data(args, hard_triplets)

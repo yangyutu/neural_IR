@@ -15,11 +15,16 @@ from models.pretrained_encoder import PretrainedSentenceEncoder
 
 
 def run(args):
+
+    tags = [args.pretrained_model_name]
+    if args.tag:
+        tags.append(args.tag)
+
     wandb_logger = WandbLogger(
         project=args.project_name,  # group runs in "MNIST" project
         log_model="all",
         save_dir=args.default_root_dir,
-        tags=[args.pretrained_model_name],
+        tags=tags,
     )  # log all new checkpoints during training
 
     seed_everything(args.seed, workers=True)
@@ -90,7 +95,6 @@ def run(args):
     trainer.fit(
         model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
     )
-    # trainer.fit(model, train_dataloaders=traindata_loader)
 
 
 def debug():
@@ -151,6 +155,8 @@ def parse_arguments():
     parser.add_argument("--model_validate_every_n_steps", type=int, default=25000)
 
     parser.add_argument("--project_name", type=str, required=True)
+    parser.add_argument("--tag", type=str, default="")
+
     parser.add_argument("--default_root_dir", type=str, required=True)
 
     # model specific arguments
