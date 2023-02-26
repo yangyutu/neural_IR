@@ -95,7 +95,6 @@ def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument("--input_filename", type=str, required=True)
     parser.add_argument("--output_filename", type=str, required=True)
-    parser.add_argument("--pretrained_model_name", type=str, required=True)
     parser.add_argument("--query", action="store_true")
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--num_workers", type=int, default=24)

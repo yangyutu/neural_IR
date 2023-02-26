@@ -25,6 +25,10 @@ def _load_embedding_data(args):
 def search_from_index_mp(args):
 
     index = faiss.read_index(args.index_save_path)
+
+    if args.nprobe > 0:
+        index.nprobe = args.nprobe
+
     query_embeddings = _load_embedding_data(args)
     query_embeddings_np = np.array(list(query_embeddings.values()))
 
@@ -70,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("--index_save_path", type=str, required=True)
     parser.add_argument("--topk", type=int, default=1000)
     parser.add_argument("--num_proc", type=int, default=24)
+    parser.add_argument("--nprobe", type=int, default=-1)
 
     parser.add_argument("--output_path", type=str, required=True)
 

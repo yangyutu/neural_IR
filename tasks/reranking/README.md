@@ -247,5 +247,11 @@ notebooks/Result_analysis.ipynb
 
 
 
+### Results
 
+| Model  | MRR@10 | Recall@5 | Recall@20 | Recall@1100 |
+|--------|--------|----------|-----------|-------------|
+| MiniLM | 37.69  | 52.75    | 70.28     | 79.67       |
+| Bert-base |        |          |           |             |
+|        |        |          |           |             |
 
