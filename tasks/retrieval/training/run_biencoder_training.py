@@ -22,7 +22,7 @@ def run(args):
 
     wandb_logger = WandbLogger(
         project=args.project_name,  # group runs in "MNIST" project
-        log_model="all",
+        log_model="all" if args.log_model else False,
         save_dir=args.default_root_dir,
         tags=tags,
     )  # log all new checkpoints during training
@@ -121,7 +121,7 @@ def parse_arguments():
     parser.add_argument("--tag", type=str, default="")
 
     parser.add_argument("--default_root_dir", type=str, required=True)
-
+    parser.add_argument("--log_model", action="store_true")
     # model specific arguments
     parser.add_argument("--pretrained_model_name", type=str, required=True)
     parser.add_argument("--lr", type=float, default=1e-6)
