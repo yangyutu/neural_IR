@@ -18,7 +18,7 @@ def run(args):
 
     tags = [args.pretrained_model_name]
     if args.tag:
-        tags.append(args.tag)
+        tags.extend(args.tag.split(","))
 
     wandb_logger = WandbLogger(
         project=args.project_name,  # group runs in "MNIST" project
@@ -90,10 +90,17 @@ def run(args):
         logger=wandb_logger,
         deterministic=True,
     )
-    trainer.validate(model, valdata_loader)
-    trainer.fit(
-        model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
-    )
+    if not args.resume_training:
+        trainer.fit(
+            model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
+        )
+    else:
+        trainer.fit(
+            model,
+            train_dataloaders=traindata_loader,
+            val_dataloaders=valdata_loader,
+            ckpt_path=args.resume_ckpt,
+        )
 
 
 def parse_arguments():
@@ -131,6 +138,9 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--infer_batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=16)
+
+    parser.add_argument("--resume_training", action="store_true")
+    parser.add_argument("--resume_ckpt", type=str, default="")
 
     args = parser.parse_args()
     return args

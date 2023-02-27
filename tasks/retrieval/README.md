@@ -146,11 +146,13 @@ python build_passage_ranking_dev_data.py \
 
 ### Results
 
-| Model  | MRR@10 | Recall@5 | Recall@20 | Recall@1100 |
+| Model  | MRR@10 | Recall@5 | Recall@20 | Recall@100 |
 |--------|--------|----------|-----------|-------------|
-| MiniLM | 28.82  | 42.42    | 62.78     | 80.62       |
-| Bert-base |   31.12     |     45.12     |    64.35       |      78.92       |
+| MiniLM (30k) | 28.82  | 42.42    | 62.78     | 80.62       |
+| Bert-base (200k) |   31.12     |     45.12     |    64.35       |      78.92       |
+| MiniLM (240k) | 30.56  | 44.46    | 64.82     | 82.38      |
 |        |        |          |           |             |
 
 MiniLM 30k
-Bert-base 200k
+MiniLM 240k step
+Bert-base 200k step

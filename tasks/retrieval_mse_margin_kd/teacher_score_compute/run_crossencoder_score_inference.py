@@ -8,42 +8,24 @@ from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning.loggers.wandb import WandbLogger
 
 from models.cross_encoder_finetune import CrossEncoderFineTune
-from dataset.ms_marco_data import MSQDEvalDataModule
+from dataset.ms_marco_data import MSQDEvalDataModule, MSQDPairTrainDataModule
 
 
 def run(args):
 
-    wandb_logger = WandbLogger(
-        project=args.project_name,  # group runs in "MNIST" project
-        log_model="all",
-        save_dir=args.default_root_dir,
-    )
-
-    data_module = MSQDEvalDataModule(
-        args.qid_2_query_path,
-        args.pid_2_passage_path,
-        args.query_candidates_path,
-        args.qrels_path,
+    data_module = MSQDPairTrainDataModule(
+        args.train_triplet_path,
+        args.train_qid_2_query_path,
+        args.train_pid_2_passage_path,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-    data_loader = data_module.test_dataloader()
 
-    model = CrossEncoderFineTune(
-        pretrained_model_name=args.pretrained_model_name,
-        num_classes=2,
-        truncate=args.max_len,
-    )
+    train_loader = data_module.train_dataloader()
 
-    trainer = pl.Trainer(
-        accelerator="gpu",
-        devices=1,
-        default_root_dir=args.default_root_dir,
-        callbacks=[TQDMProgressBar(refresh_rate=20)],
-        logger=wandb_logger,
-    )
-
-    trainer.validate(model, data_loader, ckpt_path=args.model_checkpoint)
+    model = CrossEncoderFineTune.load_from_checkpoint(args.model_ckpt)
+    
+    
 
 
 def parse_arguments():

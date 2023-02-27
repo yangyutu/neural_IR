@@ -17,7 +17,7 @@ from models.cross_encoder_finetune import CrossEncoderFineTune
 def run(args):
     wandb_logger = WandbLogger(
         project=args.project_name,  # group runs in "MNIST" project
-        log_model="all",
+        log_model="all" if args.log_model else False,
         save_dir=args.default_root_dir,
         tags=[args.pretrained_model_name],
     )  # log all new checkpoints during training
@@ -48,7 +48,7 @@ def run(args):
         pretrained_model_name=args.pretrained_model_name,
         num_classes=2,
         truncate=args.max_len,
-        lr=args.lr,
+        config={"lr": args.lr},
     )
 
     checkpoint_callback = ModelCheckpoint(
@@ -77,38 +77,19 @@ def run(args):
         deterministic=True,
     )
 
-    # trainer.validate(model, valdata_loader)
-    trainer.fit(
-        model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
-    )
+    trainer.validate(model, valdata_loader)
+    if not args.resume_training:
+        trainer.fit(
+            model, train_dataloaders=traindata_loader, val_dataloaders=valdata_loader
+        )
+    else:
+        trainer.fit(
+            model,
+            train_dataloaders=traindata_loader,
+            val_dataloaders=valdata_loader,
+            ckpt_path=args.resume_ckpt,
+        )
     # trainer.fit(model, train_dataloaders=traindata_loader)
-
-
-def debug():
-    model = CrossEncoderFineTune(
-        pretrained_model_name="bert-base-uncased",
-        num_classes=2,
-        truncate=120,
-    )
-
-    data_root = "/mnt/d/MLData/Repos/neural_IR/experiments/msmarco_psg_ranking/cross_encoder_triplet_train_data_tiny"
-    pid_2_passage_path = os.path.join(data_root, "pid_2_passage_text.pkl")
-    qid_2_query_path = os.path.join(data_root, "qid_2_query_text.pkl")
-    triplet_path = os.path.join(data_root, "triplets.pkl")
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=False)
-
-    train_data_module = MSQDPairTrainDataModule(
-        triplet_path,
-        qid_2_query_path,
-        pid_2_passage_path,
-        batch_size=32,
-    )
-    traindata_loader = train_data_module.train_dataloader()
-
-    for batch in traindata_loader:
-        model.cuda()
-        model.training_step(batch)
-        break
 
 
 def parse_arguments():
@@ -127,6 +108,7 @@ def parse_arguments():
 
     parser.add_argument("--project_name", type=str, required=True)
     parser.add_argument("--default_root_dir", type=str, required=True)
+    parser.add_argument("--log_model", action="store_true")
 
     # model specific arguments
     parser.add_argument("--pretrained_model_name", type=str, required=True)
@@ -143,6 +125,9 @@ def parse_arguments():
     parser.add_argument("--max_len", type=int, default=128)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=16)
+
+    parser.add_argument("--resume_training", action="store_true")
+    parser.add_argument("--resume_ckpt", type=str, default="")
 
     args = parser.parse_args()
     return args
