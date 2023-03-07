@@ -26,6 +26,7 @@ class CrossEncoderFineTune(pl.LightningModule):
         self.linear = nn.Linear(self.cross_encoder.config.hidden_size, num_classes)
         self.truncate = truncate
         self.loss_func = nn.CrossEntropyLoss()
+        self.config = config
         self.save_hyperparameters()
 
     def model_forward(self, input_text_pairs):
@@ -99,7 +100,7 @@ class CrossEncoderFineTune(pl.LightningModule):
         return mrr
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = optim.Adam(self.parameters(), lr=self.config.get("lr", 1e-6))
         return optimizer
 
 
