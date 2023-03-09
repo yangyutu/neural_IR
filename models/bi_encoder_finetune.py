@@ -8,9 +8,10 @@ from torch.optim.lr_scheduler import LambdaLR
 from torchmetrics import RetrievalMRR, RetrievalRecall
 from transformers import AutoModel, AutoTokenizer
 from losses.multiple_negative_ranking_loss import MultipleNegativesRankingLoss
+from losses.mse_margin_distill_loss import MSEMarginDistillLoss
 
 
-class BiEncoderFineTune(pl.LightningModule):
+class BiEncoderFineTuneBase(pl.LightningModule):
     def __init__(
         self,
         query_encoder: nn.Module,
@@ -21,14 +22,12 @@ class BiEncoderFineTune(pl.LightningModule):
         self.query_encoder = query_encoder
         self.doc_encoder = doc_encoder
         self.config = config
-        # self.tokenizer = AutoTokenizer.from_pretrained(
-        #     pretrained_model_name, use_fast=True
-        # )
-        # self.truncate = truncate
-        # self.loss_func = nn.MultiLabelMarginLoss()
-        # self.loss_func = nn.MultiMarginLoss()
-        self.loss_func = MultipleNegativesRankingLoss()
+        self.initialize_loss()
         self.save_hyperparameters()
+
+    def initialize_loss(self):
+
+        raise NotImplementedError()
 
     def compute_query_embeddings(self, input_text_list):
         return self.query_encoder.encode(
@@ -42,31 +41,7 @@ class BiEncoderFineTune(pl.LightningModule):
 
     def training_step(self, batch, batch_idx=0):
 
-        query_text_list, pos_doc_text_list, neg_doc_text_list = batch
-        # for query, we use token type id 0; for doc, we use token type id 1
-        query_embeddings = self.query_encoder.encode(
-            query_text_list, device=self.device, token_type_id=0
-        )
-        pos_doc_embeddings = self.doc_encoder.encode(
-            pos_doc_text_list, device=self.device, token_type_id=1
-        )
-        neg_doc_embeddings = self.doc_encoder.encode(
-            neg_doc_text_list, device=self.device, token_type_id=1
-        )
-
-        all_embeddings = [query_embeddings, pos_doc_embeddings, neg_doc_embeddings]
-
-        loss = self.loss_func(all_embeddings)
-
-        self.log(
-            "loss",
-            loss.item(),
-            batch_size=len(query_text_list),
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-        )
-        return loss
+        raise NotImplementedError()
 
     def on_validation_epoch_start(self) -> None:
 
@@ -119,8 +94,121 @@ class BiEncoderFineTune(pl.LightningModule):
         return optimizer
 
 
-if __name__ == "__main__":
-    model = BiEncoderFineTune(
+class BiEncoderFineTuneContrastLoss(BiEncoderFineTuneBase):
+    def __init__(
+        self,
+        query_encoder: nn.Module,
+        doc_encoder: nn.Module,
+        config: Dict = [],
+    ):
+        super().__init__(
+            query_encoder=query_encoder, doc_encoder=doc_encoder, config=config
+        )
+
+    def initialize_loss(self):
+        self.loss_func = MultipleNegativesRankingLoss()
+
+    def training_step(self, batch, batch_idx=0):
+
+        query_text_list, pos_doc_text_list, neg_doc_text_list = batch
+        # for query, we use token type id 0; for doc, we use token type id 1
+        query_embeddings = self.query_encoder.encode(
+            query_text_list, device=self.device, token_type_id=0
+        )
+        pos_doc_embeddings = self.doc_encoder.encode(
+            pos_doc_text_list, device=self.device, token_type_id=1
+        )
+        neg_doc_embeddings = self.doc_encoder.encode(
+            neg_doc_text_list, device=self.device, token_type_id=1
+        )
+
+        all_embeddings = [query_embeddings, pos_doc_embeddings, neg_doc_embeddings]
+
+        loss = self.loss_func(all_embeddings)
+
+        self.log(
+            "loss",
+            loss.item(),
+            batch_size=len(query_text_list),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        return loss
+
+
+class BiEncoderFineTuneContrastLossWithMSEMarginDistillation(BiEncoderFineTuneBase):
+    def __init__(
+        self,
+        query_encoder: nn.Module,
+        doc_encoder: nn.Module,
+        teacher_query_encoder: nn.Module,
+        teacher_doc_encoder: nn.Module,
+        config: Dict = [],
+    ):
+        super().__init__(
+            query_encoder=query_encoder, doc_encoder=doc_encoder, config=config
+        )
+        self.teacher_query_encoder = teacher_query_encoder
+        self.teacher_doc_encoder = teacher_doc_encoder
+
+    def initialize_loss(self):
+        self.contrast_loss_func = MultipleNegativesRankingLoss()
+        self.mse_margin_loss_func = MSEMarginDistillLoss()
+
+    def training_step(self, batch, batch_idx=0):
+
+        query_text_list, pos_doc_text_list, neg_doc_text_list = batch
+        # for query, we use token type id 0; for doc, we use token type id 1
+        query_embeddings = self.query_encoder.encode(
+            query_text_list, device=self.device, token_type_id=0
+        )
+        pos_doc_embeddings = self.doc_encoder.encode(
+            pos_doc_text_list, device=self.device, token_type_id=1
+        )
+        neg_doc_embeddings = self.doc_encoder.encode(
+            neg_doc_text_list, device=self.device, token_type_id=1
+        )
+
+        all_embeddings = [query_embeddings, pos_doc_embeddings, neg_doc_embeddings]
+
+        query_embeddings_teacher = self.teacher_query_encoder.encode(
+            query_text_list, device=self.device, token_type_id=0
+        )
+        pos_doc_embeddings_teacher = self.teacher_doc_encoder.encode(
+            pos_doc_text_list, device=self.device, token_type_id=1
+        )
+        neg_doc_embeddings_teacher = self.teacher_doc_encoder.encode(
+            neg_doc_text_list, device=self.device, token_type_id=1
+        )
+
+        all_embeddings_teacher = [
+            query_embeddings_teacher,
+            pos_doc_embeddings_teacher,
+            neg_doc_embeddings_teacher,
+        ]
+
+        loss_contrast = self.contrast_loss_func(all_embeddings)
+        loss_dl = self.mse_margin_loss_func(all_embeddings, all_embeddings_teacher)
+
+        loss = loss_contrast + self.config["distill_loss_coeff"] * loss_dl
+
+        self.log_dict(
+            {
+                "loss": loss.item(),
+                "loss_contrast": loss_contrast.item(),
+                "loss_dl": loss_dl.item(),
+            },
+            batch_size=len(query_text_list),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        return loss
+
+
+def _test_biencoder_contrast():
+    model = BiEncoderFineTuneContrastLoss(
         pretrained_model_name="distilbert-base-uncased",
         num_classes=2,
         truncate=120,
@@ -149,3 +237,7 @@ if __name__ == "__main__":
     for batch in data_loader:
         model.training_step(batch)
         break
+
+
+if __name__ == "__main__":
+    _test_biencoder_contrast()
