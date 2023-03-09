@@ -10,7 +10,7 @@ from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning import seed_everything
 
 from dataset.ms_marco_data import MSQDTripletTrainDataModule, MSQDEvalDataModule
-from models.bi_encoder_finetune import BiEncoderFineTune
+from models.bi_encoder_finetune import BiEncoderFineTuneContrastLoss
 from models.pretrained_encoder import PretrainedSentenceEncoder
 
 
@@ -58,7 +58,7 @@ def run(args):
 
     config["lr"] = args.lr
 
-    model = BiEncoderFineTune(
+    model = BiEncoderFineTuneContrastLoss(
         query_encoder=encoder,
         doc_encoder=encoder,
         config=config,

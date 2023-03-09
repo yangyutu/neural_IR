@@ -4,11 +4,12 @@ pretrained_model_name="bert-base-uncased"
 pretrained_model_name="sentence-transformers/msmarco-distilbert-base-v4"
 pretrained_model_name="microsoft/MiniLM-L12-H384-uncased"
 pretrained_model_name="nreimers/MiniLM-L6-H384-uncased"
+pretrained_model_name="nreimers/MiniLM-L3-H384-uncased"
 
 #bert-base-uncased
 #sentence-transformers/msmarco-distilbert-base-v4
 export CUDA_VISIBLE_DEVICES="0"
-python run_biencoder_training.py \
+python tasks/retrieval/training/run_biencoder_training.py \
 --gpus 1 \
 --limit_train_batches 1.0 \
 --max_epochs 3 \
