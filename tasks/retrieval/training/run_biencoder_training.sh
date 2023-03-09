@@ -3,6 +3,8 @@ val_data_root=./experiments/msmarco_psg_ranking/dev_data_sz_1000/
 pretrained_model_name="bert-base-uncased"
 pretrained_model_name="sentence-transformers/msmarco-distilbert-base-v4"
 pretrained_model_name="microsoft/MiniLM-L12-H384-uncased"
+pretrained_model_name="nreimers/MiniLM-L6-H384-uncased"
+
 #bert-base-uncased
 #sentence-transformers/msmarco-distilbert-base-v4
 export CUDA_VISIBLE_DEVICES="0"

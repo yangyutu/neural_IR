@@ -153,6 +153,14 @@ python build_passage_ranking_dev_data.py \
 | MiniLM (240k) | 30.56  | 44.46    | 64.82     | 82.38      |
 |        |        |          |           |             |
 
+| Model  | MRR@10 | Recall@5 | Recall@20 | Recall@100 |
+|--------|--------|----------|-----------|-------------|
+| Bert-base (200k) BM25 Neg |   31.12     |     45.12     |    64.35       |      78.92       |
+| Bert-base (200k) fully random neg |   27.52     |     40.93     |    62.59       |      81.45       |
+|        |        |          |           |             |
+
+
+
 MiniLM 30k
 MiniLM 240k step
 Bert-base 200k step
