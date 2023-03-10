@@ -64,6 +64,7 @@ def run(args):
     config = {}
 
     config["lr"] = args.lr
+    config['distill_loss_type'] = args.distill_loss_type
     config["distill_loss_coeff"] = args.distill_loss_coeff
 
     model = BiEncoderFineTuneContrastLossWithMSEMarginDistillation(
@@ -135,6 +136,7 @@ def parse_arguments():
     # model specific arguments
     parser.add_argument("--pretrained_model_name", type=str, required=True)
     parser.add_argument("--teacher_model_ckpt", type=str, required=True)
+    parser.add_argument("--distill_loss_type", type=str, choices=['mse_margin', 'kl_div_loss','listnet_loss'])
     parser.add_argument("--distill_loss_coeff", type=float, default=0.1)
 
     parser.add_argument("--lr", type=float, default=1e-6)

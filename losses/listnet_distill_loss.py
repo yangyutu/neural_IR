@@ -2,9 +2,9 @@ import torch
 from torch import nn, Tensor
 from typing import Iterable, Dict
 from losses.utils import cos_sim
+import torch.nn.functional as F
 
-
-class MSEMarginDistillLoss(nn.Module):
+class ListNetDistillLoss(nn.Module):
     """
     This loss expects as input a batch consisting of sentence pairs (a_1, p_1), (a_2, p_2)..., (a_n, p_n)
     where we assume that (a_i, p_i) are a positive pair and (a_i, p_j) for i!=j a negative pair.
@@ -40,14 +40,16 @@ class MSEMarginDistillLoss(nn.Module):
     def __init__(
         self,
         similarity_fct=cos_sim,
+        temperature=1.0
     ):
         """
         :param model: SentenceTransformer model
         :param scale: Output of similarity function is multiplied by scale value
         :param similarity_fct: similarity function between sentence embeddings. By default, cos_sim. Can also be set to dot product (and then set scale to 1)
         """
-        super(MSEMarginDistillLoss, self).__init__()
+        super(ListNetDistillLoss, self).__init__()
         self.similarity_fct = similarity_fct
+        self.temperature = temperature
 
     def _compute_scores(self, sentence_embeddings: Iterable[Tensor]):
         reps = sentence_embeddings
@@ -65,10 +67,11 @@ class MSEMarginDistillLoss(nn.Module):
 
         teacher_scores = self._compute_scores(teacher_sentence_embeddings)
         student_scores = self._compute_scores(student_sentence_embeddings)
-
-        score_margins = teacher_scores - student_scores
-        score_margin_ms = torch.mean(torch.square(score_margins))
-        return score_margin_ms
+        teacher_scores_normalized = F.softmax(teacher_scores / self.temperature, dim=1)
+        student_scores_normalized = F.softmax(student_scores / self.temperature, dim=1)
+        student_scores_normalized_log = torch.log(student_scores_normalized + 1e-6)
+        loss = torch.mean(-torch.sum(teacher_scores_normalized * student_scores_normalized_log, dim=1))
+        return loss
 
     def get_config_dict(self):
         return {"similarity_fct": self.similarity_fct.__name__}
@@ -76,7 +79,7 @@ class MSEMarginDistillLoss(nn.Module):
 
 def _test():
     
-    loss_fn = MSEMarginDistillLoss()
+    loss_fn = ListNetDistillLoss()
     teacher_embeddings = [torch.Tensor([[1,1],[2,2]]), torch.Tensor([[1,1],[2,2]]), torch.Tensor([[1,1],[2,2]])]
     student_embeddings = [torch.Tensor([[1,1],[2,2]]), torch.Tensor([[1,1],[2,2]]), torch.Tensor([[1,1],[2,2]])]
     

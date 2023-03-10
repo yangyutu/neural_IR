@@ -9,6 +9,9 @@ from torchmetrics import RetrievalMRR, RetrievalRecall
 from transformers import AutoModel, AutoTokenizer
 from losses.multiple_negative_ranking_loss import MultipleNegativesRankingLoss
 from losses.mse_margin_distill_loss import MSEMarginDistillLoss
+from losses.kl_divergence_distill_loss import KLDivergenceDistillLoss
+from losses.listnet_distill_loss import ListNetDistillLoss
+
 
 
 class BiEncoderFineTuneBase(pl.LightningModule):
@@ -137,7 +140,7 @@ class BiEncoderFineTuneContrastLoss(BiEncoderFineTuneBase):
         return loss
 
 
-class BiEncoderFineTuneContrastLossWithMSEMarginDistillation(BiEncoderFineTuneBase):
+class BiEncoderFineTuneContrastLossWithDistillation(BiEncoderFineTuneBase):
     def __init__(
         self,
         query_encoder: nn.Module,
@@ -154,7 +157,13 @@ class BiEncoderFineTuneContrastLossWithMSEMarginDistillation(BiEncoderFineTuneBa
 
     def initialize_loss(self):
         self.contrast_loss_func = MultipleNegativesRankingLoss()
-        self.mse_margin_loss_func = MSEMarginDistillLoss()
+        
+        if self.config['distill_loss_type'] == 'mse_margin':
+            self.distill_loss_func = MSEMarginDistillLoss()
+        elif self.config['distill_loss_type'] == 'kl_div_loss':
+            self.distill_loss_func = KLDivergenceDistillLoss()
+        elif self.config['distill_loss_type'] == 'listnet_loss':
+            self.distill_loss_func = ListNetDistillLoss()
 
     def training_step(self, batch, batch_idx=0):
 
