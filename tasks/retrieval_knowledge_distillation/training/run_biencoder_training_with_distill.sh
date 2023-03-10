@@ -10,7 +10,7 @@ distill_method=listnet_loss
 #bert-base-uncased
 #sentence-transformers/msmarco-distilbert-base-v4
 export CUDA_VISIBLE_DEVICES="0"
-python tasks/retrieval_mse_margin_kd/training/run_biencoder_training_with_distill.py \
+python tasks/retrieval_knowledge_distillation/training/run_biencoder_training_with_distill.py \
 --gpus 1 \
 --limit_train_batches 1.0 \
 --max_epochs 3 \
@@ -24,6 +24,7 @@ python tasks/retrieval_mse_margin_kd/training/run_biencoder_training_with_distil
 --teacher_model_ckpt ${teacher_model_ckpt} \
 --distill_loss_type ${distill_method} \
 --distill_loss_coeff 1.0 \
+--contrast_loss_coeff 1.0 \
 --train_triplet_path ${train_data_root}triplets.pkl \
 --train_pid_2_passage_path ${train_data_root}pid_2_passage_text.pkl \
 --train_qid_2_query_path ${train_data_root}qid_2_query_text.pkl \

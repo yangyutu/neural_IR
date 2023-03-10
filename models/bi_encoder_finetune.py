@@ -198,9 +198,9 @@ class BiEncoderFineTuneContrastLossWithDistillation(BiEncoderFineTuneBase):
         ]
 
         loss_contrast = self.contrast_loss_func(all_embeddings)
-        loss_dl = self.mse_margin_loss_func(all_embeddings, all_embeddings_teacher)
+        loss_dl = self.distill_loss_func(all_embeddings, all_embeddings_teacher)
 
-        loss = loss_contrast + self.config["distill_loss_coeff"] * loss_dl
+        loss = self.config["contrast_loss_coeff"] * loss_contrast + self.config["distill_loss_coeff"] * loss_dl
 
         self.log_dict(
             {
