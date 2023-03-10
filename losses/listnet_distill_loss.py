@@ -61,8 +61,8 @@ class ListNetDistillLoss(nn.Module):
 
     def forward(
         self,
-        teacher_sentence_embeddings: Iterable[Tensor],
         student_sentence_embeddings: Iterable[Tensor],
+        teacher_sentence_embeddings: Iterable[Tensor],
     ):
 
         teacher_scores = self._compute_scores(teacher_sentence_embeddings)
